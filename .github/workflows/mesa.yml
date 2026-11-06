@@ -11,7 +11,7 @@ jobs:
   build:
     # macos-15 ships Xcode 15.4 whose iPhoneOS SDK covers the arm64-apple-ios16.0
     # triple these scripts cross-build with (same toolchain as dinosaurrus's CI).
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
