@@ -25,9 +25,9 @@ jobs:
           git -C hackios fetch -q --depth 1 https://github.com/oosexgang/hakios-xnu-kernel 906425b75e02b4f99eb5d7bb1ef7c9583472d772
           git -C hackios checkout -q FETCH_HEAD
 
-      - name: Pick Xcode 15
+      - name: Pick Xcode
         run: |
-          XC=$(ls -d /Applications/Xcode_15*.app | sort -V | head -1)
+          XC=$(ls -d /Applications/Xcode*.app | sort -V | head -1)
           echo "XCODE_APP=$XC" >> "$GITHUB_ENV"
           sudo xcode-select -s "$XC"
           xcodebuild -version
@@ -37,7 +37,7 @@ jobs:
 
       - name: Deps
         run: |
-          brew install meson ninja bison flex llvm pkg-config
+          brew install meson ninja bison flex
           # The build scripts expect a python venv at research/mesa-build/venv
           python3 -m venv "$GITHUB_WORKSPACE/mesa-build/venv"
           "$GITHUB_WORKSPACE/mesa-build/venv/bin/pip" install mako ply pyyaml markupsafe
@@ -62,4 +62,3 @@ jobs:
           name: spes-userland
           path: research/mesa-build/out/
           if-no-files-found: error
-
