@@ -44,6 +44,11 @@ jobs:
 
       # Their build script charts its build dir from its own repo root; point it
       # at the venv we made by symlinking research/mesa-build/venv.
+      - name: Fetch Mesa 25.0.7
+        run: |
+          mkdir -p research/mesa-build
+          curl -L -o research/mesa-build/mesa-25.0.7.tar.xz https://archive.mesa3d.org/mesa-25.0.7.tar.xz
+
       - name: Mesh venv into research dir
         run: |
           mkdir -p research/mesa-build
