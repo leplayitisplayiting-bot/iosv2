@@ -1,0 +1,65 @@
+name: spes-userland
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: spes-userland-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # macos-15 ships Xcode 15.4 whose iPhoneOS SDK covers the arm64-apple-ios16.0
+    # triple these scripts cross-build with (same toolchain as dinosaurrus's CI).
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # HACKIOS_USERLAND: pinned HackiOS revision (906425b7...) whose tools/mesa
+      # patches and userland/src sources these scripts expect.
+      - name: Fetch pinned HackiOS userland
+        run: |
+          mkdir hackios
+          git init -q hackios
+          git -C hackios fetch -q --depth 1 https://github.com/oosexgang/hakios-xnu-kernel 906425b75e02b4f99eb5d7bb1ef7c9583472d772
+          git -C hackios checkout -q FETCH_HEAD
+
+      - name: Pick Xcode 15
+        run: |
+          XC=$(ls -d /Applications/Xcode_15*.app | sort -V | head -1)
+          echo "XCODE_APP=$XC" >> "$GITHUB_ENV"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+          SDK=$(ls -d "$XC"/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS*.sdk | head -1)
+          echo "IOS_SDK=$SDK" >> "$GITHUB_ENV"
+          echo "SDK: $SDK"
+
+      - name: Deps
+        run: |
+          brew install meson ninja bison flex llvm pkg-config
+          # The build scripts expect a python venv at research/mesa-build/venv
+          python3 -m venv "$GITHUB_WORKSPACE/mesa-build/venv"
+          "$GITHUB_WORKSPACE/mesa-build/venv/bin/pip" install mako ply pyyaml markupsafe
+
+      # Their build script charts its build dir from its own repo root; point it
+      # at the venv we made by symlinking research/mesa-build/venv.
+      - name: Mesh venv into research dir
+        run: |
+          mkdir -p research/mesa-build
+          ln -s "$GITHUB_WORKSPACE/mesa-build/venv" "$GITHUB_WORKSPACE/research/mesa-build/venv"
+
+      - name: Build Mesa (OSMesa + freedreno)
+        run: |
+          bash tools/build-spes-mesa-macos.sh hackios "$IOS_SDK"
+
+      - name: Build EAGL bridge (libredwood-gl)
+        run: |
+          bash tools/build-spes-eagl-macos.sh hackios "$IOS_SDK"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spes-userland
+          path: research/mesa-build/out/
+          if-no-files-found: error
+
