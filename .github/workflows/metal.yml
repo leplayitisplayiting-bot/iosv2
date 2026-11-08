@@ -1,0 +1,81 @@
+name: spes-metal
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: spes-metal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Turnip + NegroniMetal per dinosaurrus tools/build-spes-turnip-macos.sh and
+    # build-spes-metal-macos.sh (pinned revisions; macOS SDK covers ios16 triple).
+    runs-on: macos-26
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch pinned HackiOS userland (turnip patches source)
+        run: |
+          mkdir hackios
+          git init -q hackios
+          git -C hackios fetch -q --depth 1 https://github.com/oosexgang/hakios-xnu-kernel b4c5513e2df93689895d21fd3b93b723a7bcfdd3
+          git -C hackios checkout -q FETCH_HEAD
+
+      - name: Fetch iOSPlus10 (pinned c0a451f)
+        run: |
+          git clone -q https://github.com/akshaynexus/iOSPlus10 ip10
+          git -C ip10 checkout -q c0a451f
+          git -C ip10 rev-parse --short=7 HEAD
+
+      - name: Fetch ios-flame (pinned 745c434)
+        run: |
+          git clone -q https://github.com/NWylynko/ios-flame flame
+          git -C flame checkout -q 745c4341af86089efb0df851fa8a27fb8face624
+          git -C flame cat-file -e 745c4341af86089efb0df851fa8a27fb8face624^{commit}
+
+      - name: Fetch metal2vulkan (pinned 720ef1ce)
+        run: |
+          git clone -q --filter=blob:none https://github.com/steelbrain/metal2vulkan m2v
+          git -C m2v checkout -q 720ef1ce9ae2a2068999a8675717418b9416283e
+
+      - name: Pick Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode*.app | sort -V | head -1)
+          echo "XCODE_APP=$XC" >> "$GITHUB_ENV"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+          SDK=$(ls -d "$XC"/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS*.sdk | head -1)
+          echo "IOS_SDK=$SDK" >> "$GITHUB_ENV"
+          echo "SDK: $SDK"
+
+      - name: Deps
+        run: |
+          brew install bison flex cmake ninja llvm
+          echo "/opt/homebrew/opt/llvm/bin" >> "$GITHUB_PATH"
+          python3 -m venv "$GITHUB_WORKSPACE/mesa-build/venv"
+          "$GITHUB_WORKSPACE/mesa-build/venv/bin/pip" install meson ninja mako ply pyyaml markupsafe packaging
+          mkdir -p research/mesa-build
+          ln -s "$GITHUB_WORKSPACE/mesa-build/venv" "$GITHUB_WORKSPACE/research/mesa-build/venv"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustup target add aarch64-apple-ios --toolchain 1.98.0
+
+      - name: Fetch Mesa 25.0.7 tarball
+        run: |
+          mkdir -p research/mesa-build
+          curl -L -o research/mesa-build/mesa-25.0.7.tar.xz https://archive.mesa3d.org/mesa-25.0.7.tar.xz
+
+      - name: Build Turnip (freedreno Vulkan for A610)
+        run: bash tools/build-spes-turnip-macos.sh hackios ip10 "$IOS_SDK"
+
+      - name: Build NegroniMetal (ios-flame + metal2vulkan)
+        run: bash tools/build-spes-metal-macos.sh ip10 flame m2v "$IOS_SDK" research/turnip-build/libvulkan_freedreno.dylib
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spes-metal
+          path: |
+            research/turnip-build/*.dylib
+            research/metal-build/stage/
+          if-no-files-found: error
