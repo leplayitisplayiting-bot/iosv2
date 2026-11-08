@@ -52,7 +52,7 @@ jobs:
 
       - name: Deps
         run: |
-          brew install bison flex cmake ninja llvm
+          brew install bison flex cmake ninja llvm glslang expat zlib zstd
           echo "/opt/homebrew/opt/llvm/bin" >> "$GITHUB_PATH"
           python3 -m venv "$GITHUB_WORKSPACE/mesa-build/venv"
           "$GITHUB_WORKSPACE/mesa-build/venv/bin/pip" install meson ninja mako ply pyyaml markupsafe packaging
