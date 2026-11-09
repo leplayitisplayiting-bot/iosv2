@@ -66,6 +66,17 @@ jobs:
           mkdir -p research/mesa-build
           curl -L -o research/mesa-build/mesa-25.0.7.tar.xz https://archive.mesa3d.org/mesa-25.0.7.tar.xz
 
+      # tools/build-spes-metal-macos.sh hard-codes -DVULKAN_INCLUDE onto the
+      # extracted Mesa tree (their layout); extract it so include/vulkan exists.
+      - name: Extract Mesa (Vulkan headers for the Metal cmake)
+        run: |
+          tar -xJf research/mesa-build/mesa-25.0.7.tar.xz -C research/mesa-build
+          if [ ! -f research/mesa-build/mesa-25.0.7/include/vulkan/vulkan.h ]; then
+            sed -i '' 's|research/mesa-build/mesa-25.0.7/include|/opt/homebrew/include|' tools/build-spes-metal-macos.sh
+            test -f /opt/homebrew/include/vulkan/vulkan.h
+          fi
+          ls research/mesa-build/mesa-25.0.7/include
+
       - name: Build Turnip (freedreno Vulkan for A610)
         run: bash tools/build-spes-turnip-macos.sh hackios ip10 "$IOS_SDK"
 
