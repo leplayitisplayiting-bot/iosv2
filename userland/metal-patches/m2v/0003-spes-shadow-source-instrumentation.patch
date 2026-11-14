@@ -1,0 +1,26 @@
+Instrument and announce shadow-copy sources; drop the convicted modifier route.
+
+Turnip on Darwin's modifier-image path corrupted the APFS catalog at runtime
+(phone: two boot panics; reverted and verified clean). Remove 0002 from the
+applied set. The remaining ~700 full-screen blits/s of shadow copies come from
+sources nobody has named: announce each shadowed texture's format, size, row
+pitch and the alias refusal that caused it (16 per process, stderr -> ring).
+
+--- a/crates/metal2vulkan-runtime/src/texture.rs
++++ b/crates/metal2vulkan-runtime/src/texture.rs
+@@ -2073,6 +2073,16 @@ impl Device {
+         self.shared().counts.shadowed_texture_made(aspects != every);
++        static SPES_SHADOW_LOGS: std::sync::atomic::AtomicU32 =
++            std::sync::atomic::AtomicU32::new(0);
++        if SPES_SHADOW_LOGS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 16 {
++            let short: String = why.chars().take(220).collect();
++            eprintln!(
++                "SPES Shadow: {} {}x{} rows={} {}",
++                descriptor.pixel_format,
++                layout.extent[0],
++                layout.extent[1],
++                texels.layout.row_pitch,
++                short
++            );
++        }
+         Ok(Storage::Shadow {
